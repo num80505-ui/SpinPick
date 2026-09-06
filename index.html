@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpinPick - Random Wheel</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f4f6fb;
+  color:#222;
+  text-align:center;
+}
+
+body.dark{
+  background:#17191f;
+  color:#fff;
+}
+
+header{
+  padding:18px 10px;
+}
+
+h1{
+  margin:0;
+  font-size:30px;
+}
+
+.container{
+  width:min(700px,94%);
+  margin:auto;
+}
+
+textarea{
+  width:100%;
+  height:110px;
+  padding:12px;
+  border:1px solid #ccc;
+  border-radius:12px;
+  font-size:16px;
+  resize:none;
+}
+
+button{
+  border:0;
+  border-radius:10px;
+  padding:11px 16px;
+  margin:5px;
+  font-size:15px;
+  cursor:pointer;
+}
+
+.spin-btn{
+  background:#111;
+  color:#fff;
+  font-size:20px;
+  font-weight:bold;
+  padding:14px 35px;
+}
+
+.dark .spin-btn{
+  background:#fff;
+  color:#111;
+}
+
+/* WHEEL CENTER */
+.wheel-area{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  position:relative;
+  margin:25px auto;
+}
+
+.wheel-box{
+  width:min(88vw,520px);
+  aspect-ratio:1/1;
+  position:relative;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+canvas{
+  width:100%;
+  height:100%;
+  display:block;
+  border-radius:50%;
+  box-shadow:0 8px 30px rgba(0,0,0,.18);
+}
+
+/* FIXED POINTER */
+.pointer{
+  position:absolute;
+  top:-7px;
+  left:50%;
+  transform:translateX(-50%);
+  width:0;
+  height:0;
+  border-left:16px solid transparent;
+  border-right:16px solid transparent;
+  border-top:32px solid #e53935;
+  z-index:5;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.3));
+}
+
+.center-dot{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:42px;
+  height:42px;
+  background:white;
+  border:5px solid #222;
+  border-radius:50%;
+  z-index:3;
+}
+
+.result{
+  font-size:22px;
+  font-weight:bold;
+  margin:15px 0;
+  min-height:28px;
+}
+
+.history{
+  text-align:left;
+  background:rgba(0,0,0,.05);
+  border-radius:12px;
+  padding:15px;
+  margin:20px 0;
+}
+
+.dark .history{
+  background:rgba(255,255,255,.08);
+}
+
+.history h2{
+  margin-top:0;
+}
+
+#historyList{
+  padding-left:22px;
+}
+
+.small{
+  font-size:13px;
+  opacity:.7;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🎡 SpinPick</h1>
+  <div class="small">Random Name Wheel</div>
+</header>
+
+<div class="container">
+
+<textarea id="names" placeholder="Har line mein aik naam likho...
+Ali
+Ahmed
+Usman
+Bilal"></textarea>
+
+<div>
+  <button onclick="updateWheel()">Update Wheel</button>
+  <button onclick="shuffleNames()">🔀 Shuffle</button>
+  <button onclick="clearNames()">Clear Names</button>
+  <button onclick="toggleDark()">🌙 Dark Mode</button>
+</div>
+
+<div class="wheel-area">
+  <div class="wheel-box">
+    <canvas id="wheel" width="520" height="520"></canvas>
+    <div class="pointer"></div>
+    <div class="center-dot"></div>
+  </div>
+</div>
+
+<button class="spin-btn" onclick="spin()">SPIN</button>
+
+<div class="result" id="result">Winner yahan show hoga</div>
+
+<div class="history">
+  <h2>📜 Spin History</h2>
+  <ol id="historyList"></ol>
+  <button onclick="clearHistory()">Clear History</button>
+  <button onclick="resetAll()">Reset</button>
+</div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const namesBox = document.getElementById("names");
+const resultBox = document.getElementById("result");
+const historyList = document.getElementById("historyList");
+
+let names = [];
+let rotation = 0;
+let spinning = false;
+
+const colors = [
+  "#ff6b6b",
+  "#4dabf7",
+  "#51cf66",
+  "#fcc419",
+  "#845ef7",
+  "#ff922b",
+  "#20c997",
+  "#f06595",
+  "#339af0",
+  "#94d82d"
+];
+
+function getNames(){
+  return namesBox.value
+    .split(/\n|,/)
+    .map(x => x.trim())
+    .filter(x => x.length > 0);
+}
+
+function drawWheel(){
+  names = getNames();
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(names.length === 0){
+    ctx.beginPath();
+    ctx.arc(260,260,250,0,Math.PI*2);
+    ctx.fillStyle="#ddd";
+    ctx.fill();
+
+    ctx.fillStyle="#555";
+    ctx.font="bold 24px Arial";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText("Add Names",260,260);
+    return;
+  }
+
+  const cx=260;
+  const cy=260;
+  const radius=250;
+  const slice=(Math.PI*2)/names.length;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(rotation);
+
+  for(let i=0;i<names.length;i++){
+    const start=i*slice;
+    const end=start+slice;
+
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,radius,start,end);
+    ctx.closePath();
+
+    ctx.fillStyle=colors[i%colors.length];
+    ctx.fill();
+
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=3;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(start+slice/2);
+    ctx.textAlign="right";
+    ctx.textBaseline="middle";
+    ctx.fillStyle="#fff";
+    ctx.font="bold 18px Arial";
+
+    let text=names[i];
+    if(text.length>18) text=text.substring(0,18)+"…";
+
+    ctx.fillText(text,radius-20,0);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function updateWheel(){
+  if(spinning) return;
+
+  names=getNames();
+
+  if(names.length===0){
+    resultBox.textContent="Pehle names add karo";
+    drawWheel();
+    return;
+  }
+
+  resultBox.textContent="Ready to Spin!";
+  drawWheel();
+}
+
+function shuffleNames(){
+  if(spinning) return;
+
+  let arr=getNames();
+
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+
+  namesBox.value=arr.join("\n");
+  resultBox.textContent="Names shuffled!";
+  drawWheel();
+}
+
+/*
+  IMPORTANT:
+  Winner is selected randomly first.
+  Then wheel rotates so that the selected slice
+  lands exactly under the fixed TOP pointer.
+*/
+function spin(){
+
+  if(spinning) return;
+
+  names=getNames();
+
+  if(names.length<2){
+    resultBox.textContent="Kam az kam 2 names add karo";
+    return;
+  }
+
+  spinning=true;
+  resultBox.textContent="Spinning...";
+
+  const winnerIndex=Math.floor(Math.random()*names.length);
+  const slice=(Math.PI*2)/names.length;
+
+  /*
+    Pointer is at TOP = -PI/2.
+    We calculate rotation needed for winner slice center
+    to arrive at the pointer.
+  */
+  const winnerCenter=winnerIndex*slice + slice/2;
+  const target=(-Math.PI/2) - winnerCenter;
+
+  let targetRotation=target;
+
+  while(targetRotation < rotation){
+    targetRotation += Math.PI*2;
+  }
+
+  // Extra full rotations for a real spin
+  const extraTurns=(5+Math.floor(Math.random()*4))*Math.PI*2;
+  targetRotation += extraTurns;
+
+  const startRotation=rotation;
+  const duration=4200;
+  const startTime=performance.now();
+
+  function animate(now){
+
+    const progress=Math.min((now-startTime)/duration,1);
+
+    // Smooth ease-out
+    const eased=1-Math.pow(1-progress,4);
+
+    rotation=startRotation+(targetRotation-startRotation)*eased;
+
+    drawWheel();
+
+    if(progress<1){
+      requestAnimationFrame(animate);
+    }else{
+      rotation=targetRotation;
+      drawWheel();
+
+      const winner=names[winnerIndex];
+
+      resultBox.textContent="🏆 Winner: "+winner;
+      addHistory(winner);
+
+      spinning=false;
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function addHistory(winner){
+  const li=document.createElement("li");
+  li.textContent=winner;
+  historyList.prepend(li);
+}
+
+function clearNames(){
+  if(spinning) return;
+
+  namesBox.value="";
+  resultBox.textContent="Winner yahan show hoga";
+  drawWheel();
+}
+
+function clearHistory(){
+  historyList.innerHTML="";
+}
+
+function resetAll(){
+  if(spinning) return;
+
+  namesBox.value="";
+  historyList.innerHTML="";
+  resultBox.textContent="Winner yahan show hoga";
+  rotation=0;
+  drawWheel();
+}
+
+function toggleDark(){
+  document.body.classList.toggle("dark");
+}
+
+namesBox.addEventListener("input",()=>{
+  if(!spinning) drawWheel();
+});
+
+drawWheel();
+</script>
+
+</body>
+</html>
